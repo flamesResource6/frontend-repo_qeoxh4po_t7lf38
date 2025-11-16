@@ -1,14 +1,50 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Spline from '@splinetool/react-spline'
 import { motion } from 'framer-motion'
 
 export default function Hero() {
+  const [canRenderSpline, setCanRenderSpline] = useState(false)
+  const [splineError, setSplineError] = useState(null)
+
+  useEffect(() => {
+    // Only render Spline on client and if WebGL is available
+    try {
+      const hasWindow = typeof window !== 'undefined'
+      const hasWebGL = (() => {
+        try {
+          const canvas = document.createElement('canvas')
+          return !!(
+            canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+          )
+        } catch (e) {
+          return false
+        }
+      })()
+      setCanRenderSpline(hasWindow && hasWebGL)
+    } catch (e) {
+      setCanRenderSpline(false)
+    }
+  }, [])
+
   return (
     <section className="relative min-h-[90vh] w-full overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-900 text-white">
-      <div className="absolute inset-0">
-        <Spline scene="https://prod.spline.design/DAWBaaySM7FLUKpn/scene.splinecode" style={{ width: '100%', height: '100%' }} />
-      </div>
+      {/* 3D Background (guarded) */}
+      {canRenderSpline && !splineError ? (
+        <div className="absolute inset-0">
+          <Spline
+            scene="https://prod.spline.design/DAWBaaySM7FLUKpn/scene.splinecode"
+            style={{ width: '100%', height: '100%' }}
+            onError={(e) => setSplineError(e?.message || 'Failed to load 3D scene')}
+          />
+        </div>
+      ) : (
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(59,130,246,0.35),rgba(139,92,246,0.25)_40%,transparent_70%)]"
+        />
+      )}
 
+      {/* Additional glow overlay */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(59,130,246,0.35),rgba(139,92,246,0.25)_40%,transparent_70%)]" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-40 pb-24">
@@ -29,6 +65,12 @@ export default function Hero() {
         >
           Licensed electricians delivering clean work, fast service, and safety-first installations. 24/7 emergency support across your city.
         </motion.p>
+
+        {splineError && (
+          <p className="mt-4 text-sm text-red-300/90">
+            3D background couldn’t load: {splineError}. The site will still work.
+          </p>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
