@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react'
-import Spline from '@splinetool/react-spline'
 import { motion } from 'framer-motion'
 
 export default function Hero() {
   const [canRenderSpline, setCanRenderSpline] = useState(false)
   const [splineError, setSplineError] = useState(null)
+  const [SplineComp, setSplineComp] = useState(null)
 
+  // Detect client + WebGL support and allow query param override (?no3d=1)
   useEffect(() => {
-    // Only render Spline on client and if WebGL is available
     try {
       const hasWindow = typeof window !== 'undefined'
+      const params = hasWindow ? new URLSearchParams(window.location.search) : null
+      const disable3D = params?.get('no3d') === '1'
+
       const hasWebGL = (() => {
+        if (!hasWindow || disable3D) return false
         try {
           const canvas = document.createElement('canvas')
           return !!(
@@ -20,18 +24,43 @@ export default function Hero() {
           return false
         }
       })()
-      setCanRenderSpline(hasWindow && hasWebGL)
+      setCanRenderSpline(hasWindow && hasWebGL && !disable3D)
     } catch (e) {
       setCanRenderSpline(false)
     }
   }, [])
 
+  // Lazy-load Spline only if it's safe to render
+  useEffect(() => {
+    let cancelled = false
+    async function loadSpline() {
+      if (!canRenderSpline) return
+      try {
+        const mod = await import('@splinetool/react-spline')
+        if (!cancelled) {
+          setSplineComp(() => mod.default)
+        }
+      } catch (err) {
+        if (!cancelled) setSplineError(err?.message || 'Failed to load 3D component')
+      }
+    }
+    loadSpline()
+    return () => {
+      cancelled = true
+    }
+  }, [canRenderSpline])
+
   return (
     <section className="relative min-h-[90vh] w-full overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-900 text-white">
-      {/* 3D Background (guarded) */}
-      {canRenderSpline && !splineError ? (
+      {/* Visible debug ribbon so we know the page rendered */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 rounded-full bg-white/10 backdrop-blur px-3 py-1 text-xs text-white/90 border border-white/20">
+        {canRenderSpline ? 'Mode: 3D' : 'Mode: Fallback'}
+      </div>
+
+      {/* 3D Background (guarded + lazy-loaded) */}
+      {canRenderSpline && SplineComp && !splineError ? (
         <div className="absolute inset-0">
-          <Spline
+          <SplineComp
             scene="https://prod.spline.design/DAWBaaySM7FLUKpn/scene.splinecode"
             style={{ width: '100%', height: '100%' }}
             onError={(e) => setSplineError(e?.message || 'Failed to load 3D scene')}
